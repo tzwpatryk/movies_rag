@@ -1,3 +1,4 @@
 .env
 venv-rag
 *.ipynb
+__pycache__
