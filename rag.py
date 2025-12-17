@@ -4,6 +4,7 @@ from qdrant_client import QdrantClient
 from qdrant_client import models
 from sentence_transformers import SentenceTransformer
 from fastembed import SparseTextEmbedding
+from sentence_transformers import CrossEncoder
 
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -23,6 +24,7 @@ dense_model = SentenceTransformer(
     "Qwen/Qwen3-Embedding-0.6B", trust_remote_code=True, device="mps"
 )
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="mps")
 
 client = QdrantClient(url="http://localhost:6333")
 llm_translator = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, max_tokens=80)
@@ -59,7 +61,7 @@ class MovieSearchIntent(BaseModel):
 
     query_english: str = Field(
         ...,
-        description="Temat fabuły przetłumaczony na angielski. Np. dla 'komedia o psach' -> 'dogs'. USUŃ gatunki, lata i oceny z tego tekstu.",
+        description="Temat fabuły przetłumaczony na angielski. Np. dla 'komedia o psach' -> 'funny dogs'. Zostaw przymiotniki (straszny, zabawny), usuń tylko techniczne określenia lat i oceny.",
     )
     genres: Optional[List[str]] = Field(
         None,
@@ -90,7 +92,7 @@ query_analyzer = router_prompt | llm_router.with_structured_output(MovieSearchIn
 
 
 def build_qdrant_filter(intent: MovieSearchIntent) -> Optional[models.Filter]:
-    conditions = []
+    must_conditions = []
 
     if intent.year_min or intent.year_max:
         range_params = {}
@@ -99,36 +101,61 @@ def build_qdrant_filter(intent: MovieSearchIntent) -> Optional[models.Filter]:
         if intent.year_max:
             range_params["lte"] = intent.year_max
 
-        conditions.append(
+        must_conditions.append(
             models.FieldCondition(key="year", range=models.Range(**range_params))
         )
 
     if intent.min_score:
-        conditions.append(
+        must_conditions.append(
             models.FieldCondition(
                 key="vote_average", range=models.Range(gte=intent.min_score)
             )
         )
 
     if intent.max_runtime:
-        conditions.append(
+        must_conditions.append(
             models.FieldCondition(
                 key="runtime", range=models.Range(lte=intent.max_runtime)
             )
         )
 
     if intent.genres:
-        for genre in intent.genres:
-            conditions.append(
+        if len(intent.genres) == 1:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="genres", match=models.MatchValue(value=intent.genres[0])
+                )
+            )
+        else:
+            genre_should = [
                 models.FieldCondition(
                     key="genres", match=models.MatchValue(value=genre)
                 )
-            )
+                for genre in intent.genres
+            ]
+            must_conditions.append(models.Filter(should=genre_should))
 
-    if not conditions:
+    if not must_conditions:
         return None
 
-    return models.Filter(must=conditions)
+    return models.Filter(must=must_conditions)
+
+
+def rerank_qdrant_hits(
+    query: str, hits: List[models.ScoredPoint], top_k: int = 5
+) -> List[models.ScoredPoint]:
+    """
+    Funkcja bierze wyniki z Qdranta (hits), ocenia je rerankerem i zwraca najlepsze obiekty.
+    """
+    passages = [f"{hit.payload['title']} {hit.payload['overview']}" for hit in hits]
+    rerank_pairs = [[query, passage] for passage in passages]
+
+    scores = reranker.predict(rerank_pairs)
+
+    scored_hits = list(zip(hits, scores))
+    scored_hits.sort(key=lambda x: x[1], reverse=True)
+
+    return [hit for hit, score in scored_hits[:top_k]]
 
 
 def retrieve_movies(query: str) -> List[str]:
@@ -167,21 +194,23 @@ def retrieve_movies(query: str) -> List[str]:
                 query=query_dense,
                 using="text-dense",
                 filter=qdrant_filter,
-                limit=20,
+                limit=50,
             ),
             models.Prefetch(
                 query=query_sparse,
                 using="text-sparse",
                 filter=qdrant_filter,
-                limit=20,
+                limit=50,
             ),
         ],
         query=models.FusionQuery(fusion=models.Fusion.RRF),
         limit=10,
     )
 
+    top_hits = rerank_qdrant_hits(english_query, results.points, top_k=5)
+
     formatted_docs = []
-    for hit in results.points:
+    for hit in top_hits:
         doc_content = (
             f"Title: {hit.payload['title']}\n"
             f"Year: {hit.payload['year']}\n"
@@ -220,9 +249,11 @@ rag_chain = (
 )
 
 queries = [
-    "Jakiś horror z lat 90 o duchach?",
-    "Film gdzie gra są statki kosmiczne",
-    "Smutny klaun",
+    # "Jakiś horror z lat 90 o duchach?",
+    # "Film gdzie gra są statki kosmiczne",
+    # "Smutny klaun",
+    # "Film z początku XXI wieku. Surrealistyczny, tajemniczy. Najlepiej dobrze oceniony przez krytyków.",
+    "Niszowy film, najlepiej z lat 50-60. Najlepiej przybijający i niezrozumiały. Długi i doceniony przez krytyków."
 ]
 
 for q in queries:
