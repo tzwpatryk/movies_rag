@@ -27,7 +27,6 @@ sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="mps")
 
 client = QdrantClient(url="http://localhost:6333")
-llm_translator = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, max_tokens=80)
 llm_generator = ChatGroq(
     model="llama-3.3-70b-versatile", temperature=0, max_tokens=1024
 )
