@@ -29,17 +29,18 @@ workflow.add_edge("generate", END)
 
 app = workflow.compile()
 
-user_query = "Horror o mordercy w hokejowej osłonie twarzy"
+if __name__ == "__main__":
+    user_query = "Horror o mordercy w hokejowej osłonie twarzy"
 
-inputs = {
-    "question": user_query,
-    "original_question": user_query,
-    "retry_count": 0,
-    "context": "",
-    "is_relevant": "no",
-}
+    inputs = {
+        "question": user_query,
+        "original_question": user_query,
+        "retry_count": 0,
+        "context": "",
+        "is_relevant": "no",
+    }
 
-final_state = app.invoke(inputs)
+    final_state = app.invoke(inputs)
 
-print("\n" + "=" * 50)
-print(f"FINAL ANSWER:\n{final_state['generation']}")
+    print("\n" + "=" * 50)
+    print(f"FINAL ANSWER:\n{final_state['generation']}")
