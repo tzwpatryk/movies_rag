@@ -1,10 +1,11 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import AIMessage
+from langchain_community.tools import DuckDuckGoSearchRun
 
-from models import GraphState
+from models import GraphState, RouteQuery
 from utils import retrieve_movies
-from config import grader_chain, rewriter_chain, llm_generator
+from config import grader_chain, rewriter_chain, llm_generator, llm_router
 
 template = """Jesteś ekspertem filmowym. Odpowiedz na pytanie użytkownika na podstawie poniższych fragmentów filmów.
 Jeśli w kontekście nie ma odpowiedzi, powiedz, że nie wiesz. Nie wymyślaj filmów spoza kontekstu.
@@ -58,13 +59,45 @@ def rewrite_query_node(state: GraphState):
     return {"synthesized_query": better_question, "retry_count": retry_count}
 
 
+# def generate_node(state: GraphState):
+#     print("--- GENERATE: Generuję odpowiedź końcową... ---")
+#     context = state.get("context", "")
+#     if not context:
+#         template = "Jesteś ekspertem filmowym. Rozmawiaj swobodnie z użytkownikiem. Pytanie: {question}"
+#     else:
+#         generation_chain = prompt | llm_generator | StrOutputParser()
+#         response = generation_chain.invoke(
+#             {"context": state["context"], "question": state["synthesized_query"]}
+#         )
+
+#     return {"generation": response, "chat_history": [AIMessage(content=response)]}
+
+
 def generate_node(state: GraphState):
     print("--- GENERATE: Generuję odpowiedź końcową... ---")
 
-    generation_chain = prompt | llm_generator | StrOutputParser()
-    response = generation_chain.invoke(
-        {"context": state["context"], "question": state["synthesized_query"]}
-    )
+    context = state.get("context", "")
+    question = state["question"]
+
+    # 1. TRYB CHAT (Brak kontekstu z bazy/internetu -> luźna rozmowa)
+    if not context:
+        print("   -> Tryb: General Chat")
+        chat_template = """Jesteś ekspertem filmowym. Rozmawiaj swobodnie z użytkownikiem. 
+        Bądź pomocny, uprzejmy i wykazuj się wiedzą o kinie, ale nie zmyślaj faktów.
+        
+        PYTANIE UŻYTKOWNIKA: {question}
+        """
+        chat_prompt = ChatPromptTemplate.from_template(chat_template)
+
+        chat_chain = chat_prompt | llm_generator | StrOutputParser()
+        response = chat_chain.invoke({"question": question})
+
+    else:
+        print("   -> Tryb: RAG / Context QA")
+        rag_chain = prompt | llm_generator | StrOutputParser()
+        query_to_use = state.get("synthesized_query") or question
+
+        response = rag_chain.invoke({"context": context, "question": query_to_use})
 
     return {"generation": response, "chat_history": [AIMessage(content=response)]}
 
@@ -77,3 +110,38 @@ def decide_next_step(state):
             print("--- MAX RETRIES: Poddaję się, generuję z tym co mam. ---")
             return "generate"
         return "rewrite_query"
+
+
+def route_question(state):
+    print("--- ROUTE QUESTION ---")
+    question = state["question"]
+
+    system = """Jesteś ekspertem kierującym ruchem w asystencie filmowym.
+    - Jeśli użytkownik prosi o rekomendację filmu, szuka fabuły, gatunku -> 'vectorstore'.
+    - Jeśli pyta o aktualności, box office, premiery z tego roku, repertuar kin -> 'web_search'.
+    - Jeśli to powitanie, pytanie o wiedzę ogólną (np. 'Kim jest Nolan?'), podziękowanie -> 'general_chat'.
+    """
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system),
+            ("human", "{question}"),
+        ]
+    )
+
+    router = prompt | llm_router.with_structured_output(RouteQuery)
+    decision = router.invoke({"question": question})
+
+    return decision.destination
+
+
+def web_search_node(state):
+    print("--- WEB SEARCH ---")
+    question = state["question"]
+
+    search = DuckDuckGoSearchRun()
+    results = search.invoke(question)
+
+    # Zapisujemy wyniki z sieci do 'context' w stanie,
+    # żeby węzeł 'generate' mógł z nich skorzystać tak samo jak z bazy wektorowej.
+    return {"context": results, "is_relevant": "yes"}

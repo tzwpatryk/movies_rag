@@ -28,6 +28,7 @@ llm_translator = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, max_to
 llm_generator = ChatGroq(
     model="llama-3.3-70b-versatile", temperature=0, max_tokens=1024
 )
+llm_router = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, max_tokens=80)
 
 # ===== GRADER =====
 

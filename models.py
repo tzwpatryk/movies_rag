@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional, List, Annotated
+from typing import TypedDict, Optional, List, Annotated, Literal
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -12,6 +12,15 @@ class GraphState(TypedDict):
     retry_count: int  # Licznik prób, żeby uniknąć nieskończonej pętli
     generation: str
     chat_history: Annotated[List[BaseMessage], add_messages]  # Historia rozmowy
+
+
+class RouteQuery(BaseModel):
+    """Kieruje zapytanie w odpowiednie miejsce"""
+
+    destination: Literal["vectorstore", "web_search", "general_chat"] = Field(
+        ...,
+        description="Gdzie skierować pytanie: 'vectorstore' dla rekomendacji filmowych, 'web_search' dla aktualnych wydarzeń/repertuaru, 'general_chat' dla zwykłej rozmowy.",
+    )
 
 
 class GradeDocuments(BaseModel):
