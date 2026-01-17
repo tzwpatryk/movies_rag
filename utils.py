@@ -87,8 +87,7 @@ def build_qdrant_filter(intent: MovieSearchIntent) -> Optional[models.Filter]:
 
 def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[str]:
     """
-    Funkcja zamienia pytanie na intencję (filtry + temat), tworzy wektory
-    i pyta Qdranta używając Hybrid Search z filtrowaniem metadanych.
+    Zwraca: (sformatowane_dokumenty, zsyntezowane_zapytanie_angielskie)
     """
 
     print(f"\n🧠 Analizuję intencję zapytania: '{query}'...")
@@ -151,6 +150,6 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
         formatted_docs.append(doc_content)
 
     if not formatted_docs:
-        return "Nie znaleziono filmów spełniających kryteria."
+        return "Nie znaleziono filmów spełniających kryteria.", english_query
 
-    return "\n\n".join(formatted_docs)
+    return "\n\n".join(formatted_docs), english_query

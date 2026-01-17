@@ -33,11 +33,15 @@ llm_generator = ChatGroq(
 
 structured_llm_grader = llm_grader.with_structured_output(GradeDocuments)
 
-system_grader_prompt = """Jesteś surowym krytykiem. Oceniasz, czy znalezione fragmenty filmów (KONTEKST) 
-zawierają informacje potrzebne do odpowiedzi na pytanie użytkownika.
+system_grader_prompt = """Jesteś pomocnym asystentem, który weryfikuje trafność wyników wyszukiwania.
 
-Jeśli filmy pasują tematycznie lub zawierają odpowiedź -> zwróć 'yes'.
-Jeśli filmy są zupełnie nie na temat (np. pytanie o horror, a filmy to komedie) -> zwróć 'no'.
+Twoim zadaniem jest sprawdzenie, czy znalezione filmy SĄ TEMATYCZNIE ZWIĄZANE z pytaniem.
+Nie oceniaj daty ani oceny filmu (to zostało już przefiltrowane przez bazę danych).
+
+Zasady:
+1. Jeśli pytanie dotyczy "filmu wojennego", a w kontekście są filmy wojenne -> zwróć 'yes'.
+2. Jeśli pytanie dotyczy "komedii", a w kontekście są horrory -> zwróć 'no'.
+3. Bądź wyrozumiały. Jeśli wynik jest chociaż trochę pasujący -> zwróć 'yes'.
 """
 
 grade_prompt = ChatPromptTemplate.from_messages(

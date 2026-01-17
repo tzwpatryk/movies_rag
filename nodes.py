@@ -25,9 +25,9 @@ def retrieve_node(state: GraphState):
     print(
         f"\n--- RETRIEVE: Szukam filmów dla: '{query_to_use} i historii {state['chat_history']}' ---"
     )
-    documents = retrieve_movies(query_to_use, state["chat_history"])
+    documents, synthesized_query = retrieve_movies(query_to_use, state["chat_history"])
 
-    return {"context": documents}
+    return {"context": documents, "synthesized_query": synthesized_query}
 
 
 def grade_documents_node(state: GraphState):
