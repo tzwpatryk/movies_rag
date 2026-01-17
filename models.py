@@ -1,14 +1,17 @@
-from typing import TypedDict, Optional, List
+from typing import TypedDict, Optional, List, Annotated
 from pydantic import BaseModel, Field
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 
 class GraphState(TypedDict):
     question: str  # Aktualne pytanie (może być zmienione przez rewriter)
-    original_question: str  # Oryginalne pytanie użytkownika (do generowania odpowiedzi)
+    synthesized_query: str  # Pelne informacje o preferencjach uzytkownika
     context: str  # Znalezione filmy (tekst sformatowany)
     is_relevant: str  # Decyzja sędziego: "yes" lub "no"
     retry_count: int  # Licznik prób, żeby uniknąć nieskończonej pętli
     generation: str
+    chat_history: Annotated[List[BaseMessage], add_messages]  # Historia rozmowy
 
 
 class GradeDocuments(BaseModel):
@@ -24,6 +27,10 @@ class MovieSearchIntent(BaseModel):
     Struktura interpretacji pytania o film.
     """
 
+    synthesized_query: str = Field(
+        ...,
+        description="Pełne, opisowe zdanie w języku angielskim podsumowujące, czego szuka użytkownik, biorąc pod uwagę CAŁĄ historię rozmowy. Np. 'Horror movies from the 90s regarding space travel'.",
+    )
     query_english: str = Field(
         ...,
         description="Temat fabuły przetłumaczony na angielski. Np. dla 'komedia o psach' -> 'funny dogs'. Zostaw przymiotniki (straszny, zabawny), usuń tylko techniczne określenia lat i oceny.",

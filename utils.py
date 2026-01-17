@@ -1,4 +1,5 @@
 from typing import Optional, List
+from langchain_core.messages import BaseMessage
 
 from qdrant_client import models
 
@@ -20,7 +21,6 @@ def rerank_qdrant_hits(
     Funkcja bierze wyniki z Qdranta (hits), ocenia je rerankerem i zwraca najlepsze obiekty.
     """
 
-    # print(hits)
     passages = [
         f"{hit.payload['title']} {hit.payload['overview']} {" ".join(hit.payload['keywords'])}"
         for hit in hits
@@ -85,7 +85,7 @@ def build_qdrant_filter(intent: MovieSearchIntent) -> Optional[models.Filter]:
     return models.Filter(must=must_conditions)
 
 
-def retrieve_movies(query: str) -> List[str]:
+def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[str]:
     """
     Funkcja zamienia pytanie na intencję (filtry + temat), tworzy wektory
     i pyta Qdranta używając Hybrid Search z filtrowaniem metadanych.
@@ -93,9 +93,10 @@ def retrieve_movies(query: str) -> List[str]:
 
     print(f"\n🧠 Analizuję intencję zapytania: '{query}'...")
 
-    intent = query_analyzer.invoke({"query": query})
+    intent = query_analyzer.invoke({"query": query, "chat_history": chat_history})
 
-    english_query = intent.query_english
+    english_query = intent.synthesized_query
+    print(f"\n Obecne zsyntezowane zapytanie: '{english_query}'")
     qdrant_filter = build_qdrant_filter(intent)
 
     print(f"   -> Temat (EN): '{english_query}'")
@@ -127,7 +128,7 @@ def retrieve_movies(query: str) -> List[str]:
                 query=query_sparse,
                 using="text-sparse",
                 filter=qdrant_filter,
-                limit=20,
+                limit=50,
             ),
         ],
         query=models.FusionQuery(fusion=models.Fusion.RRF),

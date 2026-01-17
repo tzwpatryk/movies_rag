@@ -1,4 +1,6 @@
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import HumanMessage
 
 from nodes import (
     retrieve_node,
@@ -27,20 +29,29 @@ workflow.add_conditional_edges(
 workflow.add_edge("rewrite_query", "retrieve")  # Pętla powrotna
 workflow.add_edge("generate", END)
 
-app = workflow.compile()
+memory = MemorySaver()
+app = workflow.compile(checkpointer=memory)
 
 if __name__ == "__main__":
     user_query = "Horror o mordercy w hokejowej osłonie twarzy"
 
     inputs = {
         "question": user_query,
-        "original_question": user_query,
+        "synthesized_query": user_query,
         "retry_count": 0,
         "context": "",
         "is_relevant": "no",
+        "chat_history": [HumanMessage(content=user_query)],
     }
 
-    final_state = app.invoke(inputs)
+    # config is required when using checkpointer
+    config = {"configurable": {"thread_id": "1"}}
 
-    print("\n" + "=" * 50)
-    print(f"FINAL ANSWER:\n{final_state['generation']}")
+    print(f"--- Starting Agent for query: {user_query} ---")
+
+    for event in app.stream(inputs, config=config):
+        for node, values in event.items():
+            print(f"--- Node '{node}' finished ---")
+            if node == "generate":
+                print("\n" + "=" * 50)
+                print(f"FINAL ANSWER:\n{values['generation']}")

@@ -1,5 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import AIMessage
 
 from models import GraphState
 from utils import retrieve_movies
@@ -20,15 +21,18 @@ prompt = ChatPromptTemplate.from_template(template)
 
 
 def retrieve_node(state: GraphState):
-    print(f"--- RETRIEVE: Szukam filmów dla: '{state['question']}' ---")
-    documents = retrieve_movies(state["question"])
+    query_to_use = state.get("synthesized_query") or state["question"]
+    print(
+        f"\n--- RETRIEVE: Szukam filmów dla: '{query_to_use} i historii {state['chat_history']}' ---"
+    )
+    documents = retrieve_movies(query_to_use, state["chat_history"])
 
     return {"context": documents}
 
 
 def grade_documents_node(state: GraphState):
     print("--- CHECK: Sędzia ocenia wyniki... ---")
-    question = state["question"]
+    question = state["synthesized_query"]
     context = state["context"]
 
     if "Nie znaleziono filmów" in context:
@@ -44,14 +48,14 @@ def grade_documents_node(state: GraphState):
 def rewrite_query_node(state: GraphState):
     print("--- REWRITE: Przepisuję zapytanie... ---")
 
-    question = state["original_question"]
+    question = state["synthesized_query"]
     retry_count = state["retry_count"] + 1
 
     better_question = rewriter_chain.invoke({"question": question})
 
     print(f"   -> Nowe zapytanie (próba {retry_count}): '{better_question}'")
 
-    return {"question": better_question, "retry_count": retry_count}
+    return {"synthesized_query": better_question, "retry_count": retry_count}
 
 
 def generate_node(state: GraphState):
@@ -59,10 +63,10 @@ def generate_node(state: GraphState):
 
     generation_chain = prompt | llm_generator | StrOutputParser()
     response = generation_chain.invoke(
-        {"context": state["context"], "question": state["original_question"]}
+        {"context": state["context"], "question": state["synthesized_query"]}
     )
 
-    return {"generation": response}
+    return {"generation": response, "chat_history": [AIMessage(content=response)]}
 
 
 def decide_next_step(state):
