@@ -20,11 +20,15 @@ def rerank_qdrant_hits(
     """
     Funkcja bierze wyniki z Qdranta (hits), ocenia je rerankerem i zwraca najlepsze obiekty.
     """
+    passages = []
+    for hit in hits:
+        title = hit.payload.get("title", "")
+        overview = hit.payload.get("overview", "")
+        tagline = hit.payload.get("tagline", "")
+        keywords = ", ".join(hit.payload.get("keywords", []))
 
-    passages = [
-        f"{hit.payload['title']} {hit.payload['overview']} {" ".join(hit.payload['keywords'])}"
-        for hit in hits
-    ]
+        passage = f"{title} {tagline} {overview} {keywords}"
+        passages.append(passage)
     rerank_pairs = [[query, passage] for passage in passages]
 
     scores = reranker.predict(rerank_pairs)
@@ -78,6 +82,60 @@ def build_qdrant_filter(intent: MovieSearchIntent) -> Optional[models.Filter]:
                 for genre in intent.genres
             ]
             must_conditions.append(models.Filter(should=genre_should))
+
+    if intent.production_companies:
+        if len(intent.production_companies) == 1:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="production_companies",
+                    match=models.MatchValue(value=intent.production_companies[0]),
+                )
+            )
+        else:
+            p_comp_should = [
+                models.FieldCondition(
+                    key="production_companies", match=models.MatchValue(value=p_comp)
+                )
+                for p_comp in intent.production_companies
+            ]
+            must_conditions.append(models.Filter(should=p_comp_should))
+
+    if intent.production_countries:
+        if len(intent.production_countries) == 1:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="production_countries",
+                    match=models.MatchValue(value=intent.production_countries[0]),
+                )
+            )
+        else:
+            p_count_should = [
+                models.FieldCondition(
+                    key="production_countries", match=models.MatchValue(value=p_count)
+                )
+                for p_count in intent.production_countries
+            ]
+            must_conditions.append(models.Filter(should=p_count_should))
+
+    if intent.original_language:
+        must_conditions.append(
+            models.FieldCondition(
+                key="original_language",
+                match=models.MatchValue(value=intent.original_language),
+            )
+        )
+
+    if intent.min_vote_count:
+        must_conditions.append(
+            models.FieldCondition(
+                key="vote_count", range=models.Range(gte=intent.min_vote_count)
+            )
+        )
+
+    if intent.include_adult is False:
+        must_conditions.append(
+            models.FieldCondition(key="adult", match=models.MatchValue(value=False))
+        )
 
     if not must_conditions:
         return None
@@ -138,16 +196,30 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
 
     formatted_docs = []
     for hit in top_hits:
+        p = hit.payload
+        genres = ", ".join(p.get("genres", []))
+        keywords = ", ".join(p.get("keywords", []))
+        production = ", ".join(p.get("production_companies", []))
+        countries = ", ".join(p.get("production_countries", []))
         doc_content = (
-            f"Title: {hit.payload['title']}\n"
-            f"Year: {hit.payload['year']}\n"
-            f"Genres: {hit.payload['genres']}\n"
-            f"Rating: {hit.payload.get('vote_average', 'N/A')}\n"
-            f"Overview: {hit.payload['overview']}\n"
-            f"Score: {hit.score:.4f}\n"
+            f"Title: {p.get('title')}\n"
+            f"Original Title: {p.get('original_title')}\n"
+            f"Year: {p.get('year')}\n"
+            f"Genres: {genres}\n"
+            f"Language: {p.get('original_language')} (Spoken: {p.get('spoken_languages')})\n"
+            f"Origin: {countries}\n"
+            f"Production: {production}\n"
+            f"Rating: {p.get('vote_average', 'N/A')} (Votes: {p.get('vote_count')})\n"
+            f"Runtime: {p.get('runtime')} min\n"
+            f"Tagline: {p.get('tagline')}\n"
+            f"Keywords: {keywords}\n"
+            f"Overview: {p.get('overview')}\n"
+            f"Relevance Score: {hit.score:.4f}\n"
             "---"
         )
         formatted_docs.append(doc_content)
+
+    print("\n\n".join(formatted_docs))
 
     if not formatted_docs:
         return "Nie znaleziono filmów spełniających kryteria.", english_query

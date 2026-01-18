@@ -62,3 +62,23 @@ class MovieSearchIntent(BaseModel):
         None,
         description="Maksymalny czas trwania w minutach. Jeśli użytkownik pisze 'krótki', ustaw 100. Jeśli 'bardzo krótki', ustaw 85.",
     )
+    original_language: Optional[str] = Field(
+        None,
+        description="Język oryginału filmu. Np. 'Polish' dla polskiego, 'English' dla angielskiego, 'French' dla francuskiego, 'Spanish' dla hiszpańskiego, 'Korean' dla koreańskiego.",
+    )
+    min_vote_count: Optional[int] = Field(
+        None,
+        description="Minimalna liczba głosów. Użyj 500 dla 'znanych'/'popularnych' filmów, 10000 dla 'wielkich hitów/blockbusterów'.",
+    )
+    include_adult: Optional[bool] = Field(
+        False,
+        description="Czy uwzględniać filmy dla dorosłych? Ustaw True tylko jeśli użytkownik wyraźnie o to prosi.",
+    )
+    production_companies: Optional[List[str]] = Field(
+        None,
+        description="Nazwa wytwórni filmowych, jeśli użytkownik o nie pyta. Np. 'Walt Disney Pictures', 'Pixar', 'Marvel Studios'. Musi być dokładna.",
+    )
+    production_countries: Optional[List[str]] = Field(
+        None,
+        description="Kraj produkcji filmu. Np. Poland, England, Finland.",
+    )

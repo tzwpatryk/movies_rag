@@ -11,7 +11,7 @@ from models import GradeDocuments, MovieSearchIntent
 from dotenv import load_dotenv
 
 load_dotenv()
-COLLECTION_NAME = "movies_db"
+COLLECTION_NAME = "movies_db_final"
 
 # ===== MODELS =====
 
