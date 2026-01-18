@@ -219,7 +219,7 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
         )
         formatted_docs.append(doc_content)
 
-    print("\n\n".join(formatted_docs))
+    # print("\n\n".join(formatted_docs))
 
     if not formatted_docs:
         return "Nie znaleziono filmów spełniających kryteria.", english_query

@@ -80,5 +80,5 @@ class MovieSearchIntent(BaseModel):
     )
     production_countries: Optional[List[str]] = Field(
         None,
-        description="Kraj produkcji filmu. Np. Poland, England, Finland.",
+        description="Kraj produkcji filmu. Np. United States of America, Poland, Finland, United Kingdom.",
     )
