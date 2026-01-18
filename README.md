@@ -1,73 +1,45 @@
-# Film Agent (LangGraph RAG)
+**System Rekomendacji Filmowej z wykorzystaniem Agentic RAG i Wyszukiwania Hybrydowego**
 
-This project is an experimental implementation of an Agentic RAG (Retrieval-Augmented Generation) system for movie recommendations. It uses **LangGraph** to create a control flow where the AI evaluates the quality of search results and self-corrects by rewriting queries if the initial retrieval is insufficient.
+## Skład grupy projektowej i podział zadań
 
-**Status:** Work in Progress / Educational Prototype
+- **Olga Śmichurska**
+  - Wyszukanie i selekcja odpowiedniego zbioru danych filmowych (TMDB Dataset).
+  - Obróbka i czyszczenie danych.
+  - Dobór zmiennych i inżynieria cech pod kątem wyszukiwania.
+  - Stworzenie i przetworzenie kolumn z embeddingami:
+    - Generowanie embeddingów gęstych (Dense) przy użyciu modelu `Qwen`.
+    - Generowanie wektorów rzadkich (Sparse) dla algorytmu BM25.
+  - Konfiguracja bazy wektorowej **Qdrant**
 
-## Architecture
+- **Patryk Danielewicz** (Budowa Agenta AI i Aplikacja)
+  - Projekt architektury agenta w oparciu o **LangGraph** (graf stanów, węzły decyzyjne).
+  - Implementacja węzłów funkcjonalnych:
+    - **Retrieve:** Integracja z Qdrant i mechanizm Hybrid Search.
+    - **Grade & Rewrite:** Logika "Sędziego" (ocena trafności) i pętla autokorekty zapytań.
+    - **Routing:** Inteligentne kierowanie pytań (baza vs. web search vs. chat).
+  - Wdrożenie mechanizmu Rerankingu poprawiającego precyzję wyników.
+  - Stworzenie interfejsu użytkownika w technologii **Streamlit**.
 
-The system does not follow a linear path. It operates as a state graph with the following logic:
+## Opis planowanych prac
 
-1. **Retrieve:** Analyzes the user query to extract metadata filters (year, genre) and performs a Hybrid Search (Dense + Sparse) in Qdrant.
-2. **Grade:** An LLM acts as a judge to evaluate if the retrieved documents are relevant to the user's question.
-3. **Rewrite (Loop):** If the documents are irrelevant, the agent reformulates the query and retries the search (up to a fixed limit).
-4. **Generate:** Once relevant context is found, the LLM generates the final answer.
+Celem projektu jest stworzenie zaawansowanego asystenta filmowego, który rozwiązuje problemy klasycznych wyszukiwarek poprzez zastosowanie architektury **Agentic RAG**. System nie tylko wyszukuje filmy, ale aktywnie "rozumie" potrzeby użytkownika, potrafi dopytać o szczegóły lub samodzielnie poprawić swoje zapytanie, jeśli pierwsze wyniki są niesatysfakcjonujące.
 
-## Tech Stack
+Głównym elementem prac jest budowa grafu, który integruje bazę wektorową z modelem językowym. Agent będzie analizował historię rozmowy, wyodrębniał filtry (rok, gatunek) z języka naturalnego oraz decydował o strategii wyszukiwania. W przypadku braku trafnych wyników w bazie, system automatycznie przeformułuje zapytanie na język angielski i ponowi próbę (pętla _Self-Correction_). Dodatkowo, dla zapytań o bieżący repertuar, agent skorzysta z wyszukiwania internetowego.
 
-- **Orchestration:** LangGraph, LangChain
-- **LLM Inference:** Groq API (Llama 3.3 70B)
-- **Vector Database:** Qdrant (Local Docker instance)
-- **Embeddings:** Qwen (Dense) + BM25 (Sparse)
-- **Reranking:** Cross-Encoder (ms-marco-MiniLM)
+### Opis problemu do rozwiązania
 
-## Project Structure
+Standardowe systemy rekomendacji często zawodzą przy zapytaniach nieprecyzyjnych lub opisowych. Użytkownicy oczekują interakcji w języku naturalnym, gdzie mogą łączyć "miękkie" opisy fabuły z "twardymi" filtrami (np. "tylko filmy po 2010 roku"). Projekt rozwiązuje problem łączenia tych dwóch światów oraz eliminuje halucynacje modeli LLM poprzez uziemienie odpowiedzi w faktycznej bazie danych (RAG). Do tego posiada dostęp do filmów bardziej niszowych, które nie zawsze byłyby zwracane przez przeglądarke albo LLM.
 
-The code is modularized into the following components:
+### Lista metod planowanych do zastosowania
 
-- `film_agent.py` - **Entry point.** Defines the StateGraph workflow, conditional edges, and runs the application.
-- `nodes.py` - **Graph Nodes.** Contains the core functions for each step: `retrieve`, `grade`, `rewrite`, and `generate`.
-- `utils.py` - **Utilities.** Handles Qdrant search logic, Pydantic models for intent extraction, and result reranking.
-- `config.py` - **Configuration.** Initializes models, clients, and environment variables.
+1.  **Hybrid Search (Wyszukiwanie Hybrydowe):** Połączenie wyszukiwania semantycznego (Dense Retrieval) z wyszukiwaniem słów kluczowych (Sparse BM25) dla zwiększenia kompletności wyników.
+2.  **Agentic Workflow (LangGraph):** Implementacja cyklicznego grafu decyzyjnego z mechanizmami pętli zwrotnej (Rewrite-Retrieve Loop).
+3.  **Semantic Routing:** Klasyfikacja intencji użytkownika w celu wyboru odpowiedniego źródła wiedzy (Vector Store / Web Search).
+4.  **Reranking:** Zastosowanie modelu Cross-Encoder do ponownej oceny i uszeregowania wyników zwróconych przez bazę wektorową.
+5.  **Metadata Extraction:** Wykorzystanie LLM do strukturyzacji zapytań (wyciąganie filtrów: rok, gatunek, ocena) z tekstu rozmowy.
 
-## Setup and Usage
+### Wskazanie zbioru danych do treningu i testowania rozwiązania
 
-**1. Prerequisites**
+Projekt wykorzysta zbiór danych **TMDB 5000 Movie Dataset** (wersja rozszerzona 2023):
 
-- Python 3.10+
-- Docker (for Qdrant)
-- Groq API Key
-
-**2. Installation**
-Install the required dependencies:
-
-```bash
-pip install -r requirements.txt
-
-```
-
-**3. Environment**
-Create a `.env` file in the root directory:
-
-```text
-GROQ_API_KEY=your_api_key_here
-
-```
-
-**4. Run Qdrant**
-Start a local Qdrant instance:
-
-```bash
-docker run -p 6333:6333 -v $(pwd)/qdrant_storage:/qdrant/storage:z qdrant/qdrant
-
-```
-
-_Note: You must have a collection named `movies_db` indexed with movie data before running the agent._
-
-**5. Execution**
-Run the agent:
-
-```bash
-python film_agent.py
-
-```
+- Źródło: [TMDB Movies Dataset 2023 (930k movies)](https://www.kaggle.com/datasets/asaniczka/tmdb-movies-dataset-2023-930k-movies)
