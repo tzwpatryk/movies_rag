@@ -143,36 +143,9 @@ def build_qdrant_filter(intent: MovieSearchIntent) -> Optional[models.Filter]:
     return models.Filter(must=must_conditions)
 
 
-def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[str]:
-    """
-    Zwraca: (sformatowane_dokumenty, zsyntezowane_zapytanie_angielskie)
-    """
-
-    print(f"\n🧠 Analizuję intencję zapytania: '{query}'...")
-
-    MAX_HISTORY_LENGHT = 6
-
-    if len(chat_history) > MAX_HISTORY_LENGHT:
-        chat_history_for_llm = chat_history[-MAX_HISTORY_LENGHT:]
-    else:
-        chat_history_for_llm = chat_history
-
-    intent = query_analyzer.invoke(
-        {"query": query, "chat_history": chat_history_for_llm}
-    )
-
-    english_query = intent.synthesized_query
-    print(f"\n Obecne zsyntezowane zapytanie: '{english_query}'")
-    qdrant_filter = build_qdrant_filter(intent)
-
-    print(f"   -> Temat (EN): '{english_query}'")
-    print(f"   -> Wykryte filtry: {intent.model_dump(exclude={'query_english'})}")
-
-    if not english_query:
-        english_query = query
-
-    print(f"\n🔍 Szukam w Qdrant (Hybrid + Filters)...")
-
+def run_qdrant_search(
+    english_query: str, qdrant_filter: Optional[models.Filter], limit: int = 20
+):
     query_dense = dense_model.encode(english_query).tolist()
 
     raw_sparse_output = list(sparse_model.embed([english_query]))[0]
@@ -198,10 +171,81 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
             ),
         ],
         query=models.FusionQuery(fusion=models.Fusion.RRF),
-        limit=20,
+        limit=limit,
+    )
+    return results.points
+
+
+def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[str]:
+    """
+    Zwraca: (sformatowane_dokumenty, zsyntezowane_zapytanie_angielskie)
+    """
+
+    print(f"\n🧠 Analizuję intencję zapytania: '{query}'...")
+
+    MAX_HISTORY_LENGHT = 6
+
+    if len(chat_history) > MAX_HISTORY_LENGHT:
+        chat_history_for_llm = chat_history[-MAX_HISTORY_LENGHT:]
+    else:
+        chat_history_for_llm = chat_history
+
+    intent = query_analyzer.invoke(
+        {"query": query, "chat_history": chat_history_for_llm}
     )
 
-    top_hits = rerank_qdrant_hits(english_query, results.points, top_k=5)
+    english_query = intent.synthesized_query
+    if not english_query:
+        english_query = query
+    print(f"\n Obecne zsyntezowane zapytanie: '{english_query}'")
+
+    qdrant_filter = build_qdrant_filter(intent)
+
+    print(f"   -> Temat (EN): '{english_query}'")
+    print(f"   -> Wykryte filtry: {intent.model_dump(exclude={'query_english'})}")
+
+    print(f"\n🔍 Szukam w Qdrant (Hybrid + Filters)...")
+
+    hits = run_qdrant_search(english_query, qdrant_filter)
+    top_hits = rerank_qdrant_hits(english_query, hits, top_k=5)
+
+    filters_relaxed_info = ""
+
+    if len(top_hits) < 2 and qdrant_filter is not None:
+        print("\nMało wyników. Uruchamiam procedurę luzowania filtrów...")
+
+        # Tworzymy luźniejszą intencję (zdejmujemy ograniczenia numeryczne)
+        relaxed_intent = intent.model_copy()
+        relaxed_intent.min_score = None  # Usuwamy wymóg oceny
+        relaxed_intent.max_runtime = None  # Usuwamy wymóg czasu trwania
+        relaxed_intent.min_vote_count = None  # Usuwamy wymóg popularności
+        relaxed_intent.year_min = (
+            None  # Usuwamy ramy czasowe (można ewentualnie poszerzyć zamiast usuwać)
+        )
+        relaxed_intent.year_max = None
+
+        # UWAGA: Zostawiamy gatunki (genres) i język, bo zazwyczaj zmiana gatunku to zupełnie inne zapytanie.
+        # Jeśli chcesz być jeszcze bardziej liberalny, możesz usunąć też genres.
+
+        relaxed_filter = build_qdrant_filter(relaxed_intent)
+
+        # Sprawdźmy, czy filtry faktycznie się zmieniły (czy było co luzować)
+        if relaxed_filter != qdrant_filter:
+            print(
+                f"   -> Filtry (Relaxed): {relaxed_intent.model_dump(exclude={'query_english', 'synthesized_query'})}"
+            )
+            print(f"\n🔍 Szukam w Qdrant (Próba 2 - Poluzowana)...")
+
+            relaxed_hits = run_qdrant_search(english_query, relaxed_filter)
+            relaxed_top_hits = rerank_qdrant_hits(english_query, relaxed_hits, top_k=5)
+
+            if relaxed_top_hits:
+                top_hits = relaxed_top_hits
+                filters_relaxed_info = (
+                    "UWAGA DLA MODELU: Nie znaleziono filmów spełniających wszystkie ścisłe kryteria użytkownika "
+                    "(np. rok, ocena). Poniższe wyniki są dobrane na podstawie dopasowania tematycznego, "
+                    "z pominięciem filtrów numerycznych. Poinformuj o tym użytkownika.\n\n"
+                )
 
     formatted_docs = []
     for hit in top_hits:
@@ -233,4 +277,5 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
     if not formatted_docs:
         return "Nie znaleziono filmów spełniających kryteria.", english_query
 
-    return "\n\n".join(formatted_docs), english_query
+    final_context = filters_relaxed_info + "\n\n".join(formatted_docs)
+    return final_context, english_query

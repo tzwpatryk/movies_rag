@@ -68,7 +68,7 @@ class MovieSearchIntent(BaseModel):
     )
     min_vote_count: Optional[int] = Field(
         None,
-        description="Minimalna liczba głosów. Użyj 500 dla 'znanych'/'popularnych' filmów, 10000 dla 'wielkich hitów/blockbusterów'.",
+        description="Minimalna liczba głosów. Użyj 200 dla 'znanych'/'popularnych' filmów, 10000 dla 'wielkich hitów/blockbusterów'.",
     )
     include_adult: Optional[bool] = Field(
         False,
