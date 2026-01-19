@@ -150,7 +150,16 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
 
     print(f"\n🧠 Analizuję intencję zapytania: '{query}'...")
 
-    intent = query_analyzer.invoke({"query": query, "chat_history": chat_history})
+    MAX_HISTORY_LENGHT = 6
+
+    if len(chat_history) > MAX_HISTORY_LENGHT:
+        chat_history_for_llm = chat_history[-MAX_HISTORY_LENGHT:]
+    else:
+        chat_history_for_llm = chat_history
+
+    intent = query_analyzer.invoke(
+        {"query": query, "chat_history": chat_history_for_llm}
+    )
 
     english_query = intent.synthesized_query
     print(f"\n Obecne zsyntezowane zapytanie: '{english_query}'")

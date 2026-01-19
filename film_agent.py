@@ -21,7 +21,6 @@ workflow.add_node("rewrite_query", rewrite_query_node)
 workflow.add_node("generate", generate_node)
 workflow.add_node("web_search", web_search_node)
 
-# workflow.set_entry_point("retrieve")
 workflow.set_conditional_entry_point(
     route_question,
     {
@@ -57,7 +56,6 @@ if __name__ == "__main__":
         "chat_history": [HumanMessage(content=user_query)],
     }
 
-    # config is required when using checkpointer
     config = {"configurable": {"thread_id": "1"}}
 
     print(f"--- Starting Agent for query: {user_query} ---")

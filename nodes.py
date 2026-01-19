@@ -59,20 +59,6 @@ def rewrite_query_node(state: GraphState):
     return {"synthesized_query": better_question, "retry_count": retry_count}
 
 
-# def generate_node(state: GraphState):
-#     print("--- GENERATE: Generuję odpowiedź końcową... ---")
-#     context = state.get("context", "")
-#     if not context:
-#         template = "Jesteś ekspertem filmowym. Rozmawiaj swobodnie z użytkownikiem. Pytanie: {question}"
-#     else:
-#         generation_chain = prompt | llm_generator | StrOutputParser()
-#         response = generation_chain.invoke(
-#             {"context": state["context"], "question": state["synthesized_query"]}
-#         )
-
-#     return {"generation": response, "chat_history": [AIMessage(content=response)]}
-
-
 def generate_node(state: GraphState):
     print("--- GENERATE: Generuję odpowiedź końcową... ---")
 
@@ -119,7 +105,7 @@ def route_question(state):
     system = """Jesteś ekspertem kierującym ruchem w asystencie filmowym.
     - Jeśli użytkownik prosi o rekomendację filmu, szuka fabuły, gatunku -> 'vectorstore'.
     - Jeśli pyta o aktualności, box office, premiery z tego roku, repertuar kin -> 'web_search'.
-    - Jeśli to powitanie, pytanie o wiedzę ogólną (np. 'Kim jest Nolan?'), podziękowanie -> 'general_chat'.
+    - Jeśli użytkownik pyta o aktorów lub reżyserów lub jeśli to powitanie, pytanie o wiedzę ogólną (np. 'Kim jest Nolan?'), podziękowanie -> 'general_chat'.
     """
 
     prompt = ChatPromptTemplate.from_messages(
@@ -142,6 +128,4 @@ def web_search_node(state):
     search = DuckDuckGoSearchRun()
     results = search.invoke(question)
 
-    # Zapisujemy wyniki z sieci do 'context' w stanie,
-    # żeby węzeł 'generate' mógł z nich skorzystać tak samo jak z bazy wektorowej.
     return {"context": results, "is_relevant": "yes"}

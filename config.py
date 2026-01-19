@@ -1,5 +1,6 @@
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer, CrossEncoder
+import torch
 
 from fastembed import SparseTextEmbedding
 from langchain_groq import ChatGroq
@@ -12,14 +13,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 COLLECTION_NAME = "movies_db_final"
-
+DEVICE = "mps"
 # ===== MODELS =====
 
 dense_model = SentenceTransformer(
-    "Qwen/Qwen3-Embedding-0.6B", trust_remote_code=True, device="mps"
+    "Qwen/Qwen3-Embedding-0.6B", trust_remote_code=True, device=DEVICE
 )
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="mps")
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device=DEVICE)
 
 client = QdrantClient(url="http://localhost:6333")
 
