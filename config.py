@@ -116,7 +116,7 @@ ZASADY FILTRÓW:
    - "Lata 90" -> 1990-1999
    - "Po 2010" -> 2011-2025
    - "Stary" -> zazwyczaj przed 1980 (zależy od kontekstu, ale bądź rozsądny).
-
+4. SPECIFIC_TITLE: Jeśli użytkownik pyta o konkretny film (np. "Opowiedz o Titanicu", "Co sądzisz o Popiół i Diament"), wpisz jego angielski tytuł do pola 'specific_title' (np. 'Titanic', 'Ashes and Diamonds'). W takim przypadku w 'query_english' wpisz również ten tytuł.
 
 PYTANIE UŻYTKOWNIKA: {query}
 """

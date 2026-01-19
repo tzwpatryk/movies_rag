@@ -105,7 +105,7 @@ def route_question(state):
     system = """Jesteś ekspertem kierującym ruchem w asystencie filmowym.
     - Jeśli użytkownik prosi o rekomendację filmu, szuka fabuły, gatunku -> 'vectorstore'.
     - Jeśli pyta o aktualności, box office, premiery z tego roku, repertuar kin -> 'web_search'.
-    - Jeśli użytkownik pyta o aktorów lub reżyserów lub jeśli to powitanie, pytanie o wiedzę ogólną (np. 'Kim jest Nolan?'), podziękowanie -> 'general_chat'.
+    - Jeśli użytkownik pyta o aktorów lub reżyserów lub jeśli nie jest to związane z tematem -> 'general_chat'.
     """
 
     prompt = ChatPromptTemplate.from_messages(

@@ -23,6 +23,7 @@ def rerank_qdrant_hits(
     passages = []
     for hit in hits:
         title = hit.payload.get("title", "")
+        specific_title = hit.payload.get("original_title", "")
         overview = hit.payload.get("overview", "")
         tagline = hit.payload.get("tagline", "")
         keywords = ", ".join(hit.payload.get("keywords", []))
@@ -34,6 +35,18 @@ def rerank_qdrant_hits(
     scores = reranker.predict(rerank_pairs)
 
     scored_hits = list(zip(hits, scores))
+
+    if specific_title:
+        boosted_hits = []
+        for hit, score in scored_hits:
+            title = hit.payload.get("title", "").lower()
+            target = specific_title.lower()
+            is_match = target == title or target in title
+            final_score = score + 10.0 if is_match else score
+            boosted_hits.append((hit, final_score))
+
+        scored_hits = boosted_hits
+
     scored_hits.sort(key=lambda x: x[1], reverse=True)
 
     return [hit for hit, score in scored_hits[:top_k]]
@@ -215,8 +228,12 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
     intent = query_analyzer.invoke(
         {"query": query, "chat_history": chat_history_for_llm}
     )
-
     english_query = intent.synthesized_query
+
+    if intent.specific_title:
+        print(f"Wykryto konkretny film: {intent.specific_title}")
+        english_query = f"{english_query} | Movie title: {intent.specific_title}"
+
     print(f"\n Obecne zsyntezowane zapytanie: '{english_query}'")
 
     qdrant_filter = build_qdrant_filter(intent)

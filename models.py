@@ -82,3 +82,7 @@ class MovieSearchIntent(BaseModel):
         None,
         description="Kraj produkcji filmu. Np. United States of America, Poland, Finland, United Kingdom.",
     )
+    specific_title: Optional[str] = Field(
+        None,
+        description="Tytuł konkretnego filmu, o który pyta użytkownik (przetłumaczony na angielski, np. 'Ashes and Diamonds', 'The Matrix'). Wypełnij TYLKO, gdy użytkownik pyta wprost o dany tytuł.",
+    )
