@@ -5,8 +5,8 @@ from langchain_core.messages import HumanMessage
 
 st.set_page_config(page_title="Film Agent", page_icon="🎬")
 
-st.title("Film Agent 🎬")
-st.markdown("Your AI movie expert. Ask me anything about movies!")
+st.title("Filmowiec AI 🎬")
+st.markdown("Twój kinowy ekspert AI. Zapytaj o cokolwiek związanego z filmami!")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -18,9 +18,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input(
-    "What movie are you looking for? (e.g., 'Horror with a hockey mask killer')"
-):
+if prompt := st.chat_input("Jakiego flmu szukasz? (np., 'Polska komedia z lat 90')"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -46,11 +44,11 @@ if prompt := st.chat_input(
                 for event in app.stream(inputs, config=config):
                     for node, values in event.items():
                         if node == "retrieve":
-                            status_placeholder.text("🔍 Searching movies...")
+                            status_placeholder.text("🔍 Szukanie filmów...")
                         elif node == "grade_documents":
-                            status_placeholder.text("⚖️ Grading relevance...")
+                            status_placeholder.text("⚖️ Ocenianie relewancji...")
                         elif node == "rewrite_query":
-                            status_placeholder.text("🔄 Refining search query...")
+                            status_placeholder.text("🔄 Poprawianie zapytania...")
                         elif node == "generate":
                             status_placeholder.empty()
                             full_response = values["generation"]
