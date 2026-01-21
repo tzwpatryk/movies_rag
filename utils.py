@@ -15,7 +15,10 @@ from models import MovieSearchIntent
 
 
 def rerank_qdrant_hits(
-    query: str, hits: List[models.ScoredPoint], top_k: int = 5
+    query: str,
+    hits: List[models.ScoredPoint],
+    specific_title: Optional[str] = None,
+    top_k: int = 5,
 ) -> List[models.ScoredPoint]:
     """
     Funkcja bierze wyniki z Qdranta (hits), ocenia je rerankerem i zwraca najlepsze obiekty.
@@ -23,13 +26,14 @@ def rerank_qdrant_hits(
     passages = []
     for hit in hits:
         title = hit.payload.get("title", "")
-        specific_title = hit.payload.get("original_title", "")
+        # orig_title = hit.payload.get("original_title", "")
         overview = hit.payload.get("overview", "")
         tagline = hit.payload.get("tagline", "")
         keywords = ", ".join(hit.payload.get("keywords", []))
 
         passage = f"{title} {tagline} {overview} {keywords}"
         passages.append(passage)
+
     rerank_pairs = [[query, passage] for passage in passages]
 
     scores = reranker.predict(rerank_pairs)
@@ -252,7 +256,7 @@ def retrieve_movies(query: str, chat_history: List[BaseMessage] = []) -> List[st
     print(f"\n🔍 Szukam w Qdrant (Hybrid + Filters)...")
 
     hits = run_qdrant_search(english_query, qdrant_filter)
-    top_hits = rerank_qdrant_hits(english_query, hits, top_k=5)
+    top_hits = rerank_qdrant_hits(english_query, hits, intent.specific_title, top_k=5)
 
     filters_info = ""
 

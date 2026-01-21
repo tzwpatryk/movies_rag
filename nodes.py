@@ -7,7 +7,7 @@ from models import GraphState, RouteQuery
 from utils import retrieve_movies
 from config import grader_chain, rewriter_chain, llm_generator, llm_router
 
-template = """Jesteś ekspertem filmowym. Odpowiedz na pytanie użytkownika na podstawie poniższych fragmentów filmów.
+template = """Jesteś ekspertem filmowym. Odpowiedz na pytanie użytkownika na podstawie poniższych fragmentów filmów. Krótko opisz każdy z filmów.
 Jeśli w kontekście nie ma odpowiedzi, powiedz, że nie wiesz. Nie wymyślaj filmów spoza kontekstu.
 
 KONTEKST (Znalezione filmy):
@@ -103,9 +103,9 @@ def route_question(state):
     question = state["question"]
 
     system = """Jesteś ekspertem kierującym ruchem w asystencie filmowym.
-    - Jeśli użytkownik prosi o rekomendację filmu, szuka fabuły, gatunku -> 'vectorstore'.
+    - Jeśli użytkownik prosi o rekomendację filmu, szuka fabuły, gatunku LUB pyta o szczegóły konkretnego filmu -> 'vectorstore'.
     - Jeśli pyta o aktualności, box office, premiery z tego roku, repertuar kin -> 'web_search'.
-    - Jeśli użytkownik pyta o aktorów lub reżyserów lub jeśli nie jest to związane z tematem -> 'general_chat'.
+    - Jeśli użytkownik pyta o aktorów (nie w kontekście szukania filmu), życie prywatne reżyserów lub luźno rozmawia -> 'general_chat'.
     """
 
     prompt = ChatPromptTemplate.from_messages(
